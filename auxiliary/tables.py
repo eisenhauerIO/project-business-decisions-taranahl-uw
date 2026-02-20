@@ -1,284 +1,130 @@
-"""Auxiliary functions for the creation of tables in the main notebook."""
+"""Table-creation functions for the NBA prediction market simulator."""
 
+import numpy as np
 import pandas as pd
-import statsmodels as sm
-import statsmodels.regression.linear_model
 
 
-def color_pvalues(value):
+def create_table1(markets_df):
     """
-    Color pvalues in output tables.
-    """
+    Create a summary statistics table for a set of NBA markets.
 
-    if value < 0.01:
-        color = "darkorange"
-    elif value < 0.05:
-        color = "red"
-    elif value < 0.1:
-        color = "magenta"
-    else:
-        color = "black"
-
-    return "color: %s" % color
-
-
-def estimate_RDD_multiple_outcomes(data, outcomes, regressors):
-    """Regression analysis with standard errors clustered on GPA, on probation cutoff for
-    multiple outcomes contained in ONE dataframe.
-
-    Args:
-    ------
-    data(pd.DataFrame): Dataset containing all data (must contain 'clustervar',
-    'gpalscutoff', & 'const')
-    outcomes(list): List of all outcomes (must correspond to column names in dataset)
-    regressors(list): List of all regressors (must correspond to column names in dataset)
-
-    Returns:
-    ---------
-    table(pd.DataFrame): Dataframe containing the coefficient, pvalue and standard error
-    for the dummy 'GPA below cutoff' and the constant.
-    """
-    table = pd.DataFrame(
-        {
-            "GPA below cutoff (1)": [],
-            "P-Value (1)": [],
-            "Std.err (1)": [],
-            "Intercept (0)": [],
-            "P-Value (0)": [],
-            "Std.err (0)": [],
-            "Observations": [],
-        }
-    )
-
-    table["outcomes"] = outcomes
-    table = table.set_index("outcomes")
-
-    for outcome in outcomes:
-        data = data.dropna(subset=[outcome])
-        model = sm.regression.linear_model.OLS(
-            data[outcome], data[regressors], hasconst=True
-        )
-        result = model.fit(cov_type="cluster", cov_kwds={"groups": data["clustervar"]})
-        outputs = [
-            result.params["gpalscutoff"],
-            result.pvalues["gpalscutoff"],
-            result.bse["gpalscutoff"],
-            result.params["const"],
-            result.pvalues["const"],
-            result.bse["const"],
-            len(data[outcome]),
-        ]
-        table.loc[outcome] = outputs
-
-    table = table.round(3)
-
-    return table
-
-
-def estimate_RDD_multiple_datasets(dictionary, keys, outcome, regressors):
-    """Regression analysis for ONE outcome with standard errors on GPA and with dictionary
-    of MANY dataframes as input.
-
-    Args:
-    ------
-    dictionary(pd.dict): Dictionary containing datasets ( datasets must contain
-    'clustervar', 'gpalscutoff', & 'const')
-    outcome(string): Name of outcome variable (must correspond to column name in datasets)
-    regressors(list): List of all regressors(must correspond to column names in datasets)
-
-    Returns:
+    Parameters
     ----------
-    table(pd.DataFrame): Dataframe containing the coefficient, pvalue and standard error
-    for the dummy 'GPA below cutoff' and the constant.
+    markets_df : pd.DataFrame
+        Markets DataFrame from kalshi.get_nba_markets.
+
+    Returns
+    -------
+    pd.DataFrame
+        Summary statistics with columns: count, mean, std, min, 25%, 50%,
+        75%, max for key numeric fields.
     """
-    table = pd.DataFrame(
-        {
-            "GPA below cutoff (1)": [],
-            "P-Value (1)": [],
-            "Std.err (1)": [],
-            "Intercept (0)": [],
-            "P-Value (0)": [],
-            "Std.err (0)": [],
-            "Observations": [],
-        }
-    )
+    numeric_cols = [c for c in ["last_price", "volume", "open_interest"]
+                    if c in markets_df.columns]
+    if not numeric_cols:
+        return pd.DataFrame()
 
-    table["groups"] = keys
-    table = table.set_index("groups")
-
-    for key in keys:
-        data = dictionary[key]
-        data = data.dropna(subset=[outcome])
-        model = sm.regression.linear_model.OLS(
-            data[outcome], data[regressors], hasconst=True
-        )
-        result = model.fit(cov_type="cluster", cov_kwds={"groups": data["clustervar"]})
-        outputs = [
-            result.params["gpalscutoff"],
-            result.pvalues["gpalscutoff"],
-            result.bse["gpalscutoff"],
-            result.params["const"],
-            result.pvalues["const"],
-            result.bse["const"],
-            len(data[outcome]),
-        ]
-        table.loc[key] = outputs
-
-    table = table.round(3)
-    return table
+    summary = markets_df[numeric_cols].describe().T
+    summary.index = [c.replace("_", " ").title() for c in summary.index]
+    summary = summary.round(2)
+    return summary
 
 
-def create_table1(data):
+def create_market_summary(histories):
     """
-    Creates Table 1.
+    Build a per-market summary table from a dictionary of trade histories.
+
+    Parameters
+    ----------
+    histories : dict
+        {ticker: pd.DataFrame} from kalshi.build_price_histories.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per market with columns: ticker, n_trades, duration_min,
+        open_prob, close_prob, max_prob, min_prob, volatility.
     """
-    variables = data[
-        [
-            "hsgrade_pct",
-            "totcredits_year1",
-            "age_at_entry",
-            "male",
-            "english",
-            "bpl_north_america",
-            "loc_campus1",
-            "loc_campus2",
-            "loc_campus3",
-            "dist_from_cut",
-            "probation_year1",
-            "probation_ever",
-            "left_school",
-            "nextGPA",
-            "suspended_ever",
-            "gradin4",
-            "gradin5",
-            "gradin6",
-        ]
-    ]
+    rows = []
+    for ticker, df in histories.items():
+        if df is None or len(df) < 2:
+            continue
+        df = df.sort_values("datetime")
+        p = df["probability"]
+        duration = (df["datetime"].max() - df["datetime"].min()).total_seconds() / 60
+        logit_p = np.log(p.clip(0.01, 0.99) / (1 - p.clip(0.01, 0.99)))
+        vol = float(np.std(np.diff(logit_p.values)))
 
-    table1 = pd.DataFrame()
-    table1["Mean"] = variables.mean()
-    table1["Standard Deviation"] = variables.std()
-    table1 = table1.astype(float).round(2)
-    table1["Description"] = [
-        "High School Grade Percentile",
-        "Credits attempted first year",
-        "Age at entry",
-        "Male",
-        "English is first language",
-        "Born in North America",
-        "At Campus 1",
-        "At Campus 2",
-        "At Campus 3",
-        "Distance from cutoff in first year",
-        "On probation after first year",
-        " Ever on acad. probation",
-        "Left Uni after 1st evaluation",
-        "Distance from cutoff at next evaluation",
-        "Ever suspended",
-        "Graduated by year  4",
-        "Graduated by year  5",
-        "Graduated by year  6",
-    ]
+        rows.append({
+            "ticker": ticker,
+            "n_trades": len(df),
+            "duration_min": round(duration, 1),
+            "open_prob": round(float(p.iloc[0]), 3),
+            "close_prob": round(float(p.iloc[-1]), 3),
+            "max_prob": round(float(p.max()), 3),
+            "min_prob": round(float(p.min()), 3),
+            "logit_volatility": round(vol, 4),
+        })
 
-    table1["Type"] = ["Characteristics"] * 9 + ["Outcomes"] * 9
-
-    return table1
+    return pd.DataFrame(rows)
 
 
-def create_table6(dictionary, keys, regressors):
+def create_calibration_table(cal_df):
     """
-    Creates Table 6.
+    Format calibration data as a display table.
+
+    Parameters
+    ----------
+    cal_df : pd.DataFrame
+        Output of simulator.calibration_data.
+
+    Returns
+    -------
+    pd.DataFrame
+        Formatted table with readable column names and rounded values.
     """
-    table6 = pd.concat(
-        [
-            estimate_RDD_multiple_datasets(
-                dictionary=dictionary,
-                keys=keys,
-                outcome="gradin4",
-                regressors=regressors,
-            ),
-            estimate_RDD_multiple_datasets(
-                dictionary=dictionary,
-                keys=keys,
-                outcome="gradin5",
-                regressors=regressors,
-            ),
-            estimate_RDD_multiple_datasets(
-                dictionary=dictionary,
-                keys=keys,
-                outcome="gradin6",
-                regressors=regressors,
-            ),
-        ],
-        axis=1,
-    )
-    table6.columns = pd.MultiIndex.from_product(
-        [
-            [
-                "Graduated after 4 years",
-                "Graduated after 5 years",
-                "Graduated after 6 years",
-            ],
-            [
-                "GPA below cutoff (1)",
-                "P-Value (1)",
-                "Std.err (1)",
-                "Intercept (0)",
-                "P-Value (0)",
-                "Std.err (0)",
-                "Observations",
-            ],
-        ]
-    )
-    return table6
+    df = cal_df.copy().dropna(subset=["predicted_prob", "actual_win_rate"])
+    df = df.rename(columns={
+        "bin_mid": "Probability Bin",
+        "predicted_prob": "Avg Predicted Prob",
+        "actual_win_rate": "Actual Win Rate",
+        "count": "N Markets",
+    })
+    numeric_cols = ["Avg Predicted Prob", "Actual Win Rate"]
+    df[numeric_cols] = df[numeric_cols].round(3)
+    return df.reset_index(drop=True)
 
 
-def describe_covariates_at_cutoff(data, bandwidth):
+def create_simulation_summary(sim_paths, p0):
     """
-    Summary table used for validity checks.
+    Summarise a set of simulated paths into a stats table.
+
+    Parameters
+    ----------
+    sim_paths : np.ndarray, shape (n_sims, n_steps + 1)
+        Output of simulator.simulate_paths.
+    p0 : float
+        Opening probability.
+
+    Returns
+    -------
+    pd.DataFrame
+        Summary at key time checkpoints (0%, 25%, 50%, 75%, 100%).
     """
-    variables = [
-        "hsgrade_pct",
-        "totcredits_year1",
-        "age_at_entry",
-        "male",
-        "english",
-        "bpl_north_america",
-        "loc_campus1",
-        "loc_campus2",
-        "loc_campus3",
-    ]
+    checkpoints = [0, 25, 50, 75, 100]
+    n_steps = sim_paths.shape[1] - 1
+    rows = []
 
-    treat = pd.DataFrame()
-    untreat = pd.DataFrame()
+    for cp in checkpoints:
+        idx = int(cp / 100 * n_steps)
+        col = sim_paths[:, idx] * 100
+        rows.append({
+            "Time (% of market life)": cp,
+            "Median (%)": round(float(np.median(col)), 1),
+            "10th pctile (%)": round(float(np.percentile(col, 10)), 1),
+            "90th pctile (%)": round(float(np.percentile(col, 90)), 1),
+            "Prob > 50% (%)": round(float((col > 50).mean() * 100), 1),
+        })
 
-    sample = data[abs(data["dist_from_cut"]) < bandwidth]
-    sample_treat = sample[sample["dist_from_cut"] < 0]
-    sample_untreat = sample[sample["dist_from_cut"] >= 0]
-
-    # treated sample.
-    treat["Mean"] = sample_treat[variables].mean()
-    treat["Std."] = sample_treat[variables].std()
-    # untreated sample.
-    untreat["Mean"] = sample_untreat[variables].mean()
-    untreat["Std."] = sample_untreat[variables].std()
-
-    table = pd.concat([treat, untreat], axis=1)
-    table.columns = pd.MultiIndex.from_product(
-        [["Below cutoff", "Above cutoff"], ["Mean", "Std."]]
-    )
-    table = table.astype(float).round(2)
-
-    table["Description"] = [
-        "High School Grade Percentile",
-        "Credits attempted first year",
-        "Age at entry",
-        "Male",
-        "English is first language",
-        "Born in North America",
-        "At Campus 1",
-        "At Campus 2",
-        "At Campus 3",
-    ]
-
-    return table
+    df = pd.DataFrame(rows)
+    return df

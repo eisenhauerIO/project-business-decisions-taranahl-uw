@@ -18,6 +18,7 @@ dependencies:
   - pytest
   - ruff
   - pre-commit
+  - requests>=2.31
   - pip
   - pip:
       - nbmake
