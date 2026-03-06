@@ -1,7 +1,7 @@
 [project]
 name = "student-project"
 version = "0.1.0"
-description = "Replication of Lindo et al. (2010) - Academic Probation RDD Analysis"
+description = "NBA Prediction Market Simulator — live Kalshi data, logit random walk, Monte Carlo fan charts, ML outcome prediction, and cross-platform Polymarket analysis"
 requires-python = ">=3.11"
 
 [tool.ruff]

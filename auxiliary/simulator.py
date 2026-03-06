@@ -18,7 +18,6 @@ Simulation generates Monte Carlo paths that respect the [0,1] boundary.
 import numpy as np
 import pandas as pd
 
-
 # ---------------------------------------------------------------------------
 # Data preparation
 # ---------------------------------------------------------------------------
@@ -244,6 +243,61 @@ def bootstrap_paths(histories, p0, n_sims=200, n_steps=100, seed=None):
 
     paths = 1 / (1 + np.exp(-theta))
     return paths
+
+
+# ---------------------------------------------------------------------------
+# Machine learning helpers
+# ---------------------------------------------------------------------------
+
+
+def build_ml_dataset(histories, settled_markets):
+    """
+    Build a labelled dataset for supervised learning from trade histories.
+
+    Extracts market microstructure features (opening probability, logit
+    volatility, trade count, market duration) from each historical game
+    and joins them with the binary win/loss outcome.
+
+    Parameters
+    ----------
+    histories : dict
+        {ticker: pd.DataFrame} from kalshi.build_price_histories.
+    settled_markets : pd.DataFrame
+        Settled markets with 'ticker' and 'result' (yes/no) columns.
+
+    Returns
+    -------
+    pd.DataFrame
+        One row per market with columns: ticker, open_prob, logit_volatility,
+        n_trades, duration_min, won (0/1).  Rows with missing outcomes are
+        dropped.
+    """
+    result_map = settled_markets.set_index("ticker")["result"] if "result" in settled_markets.columns else {}
+
+    rows = []
+    for ticker, df in histories.items():
+        if df is None or len(df) < 5:
+            continue
+        df = df.sort_values("datetime")
+        p = df["probability"].clip(0.01, 0.99)
+        logit_p = np.log(p / (1 - p))
+        vol = float(np.std(np.diff(logit_p.values)))
+        duration = (df["datetime"].max() - df["datetime"].min()).total_seconds() / 60
+
+        result = result_map.get(ticker) if hasattr(result_map, "get") else None
+        if result not in ("yes", "no"):
+            continue
+
+        rows.append({
+            "ticker": ticker,
+            "open_prob": round(float(p.iloc[0]), 4),
+            "logit_volatility": round(vol, 4),
+            "n_trades": len(df),
+            "duration_min": round(duration, 1),
+            "won": 1 if result == "yes" else 0,
+        })
+
+    return pd.DataFrame(rows)
 
 
 # ---------------------------------------------------------------------------

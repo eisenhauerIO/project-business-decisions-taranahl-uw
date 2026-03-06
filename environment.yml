@@ -11,6 +11,7 @@ dependencies:
   - seaborn>=0.13
   - scipy>=1.14
   - statsmodels>=0.14
+  - scikit-learn>=1.4
   # Development tools
   - jupyterlab
   - ipykernel

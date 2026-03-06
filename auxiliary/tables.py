@@ -95,6 +95,38 @@ def create_calibration_table(cal_df):
     return df.reset_index(drop=True)
 
 
+def create_ml_summary(coef_series, baseline_acc, ml_acc):
+    """
+    Format logistic regression results as a display table.
+
+    Parameters
+    ----------
+    coef_series : pd.Series
+        Coefficients indexed by feature name.
+    baseline_acc : float
+        Accuracy of the naive baseline (always predict the favourite).
+    ml_acc : float
+        Leave-one-out cross-validated accuracy of the logistic regression.
+
+    Returns
+    -------
+    pd.DataFrame
+        Feature coefficients table, plus a two-row accuracy comparison.
+    """
+    coef_df = pd.DataFrame({
+        "Feature": coef_series.index,
+        "Coefficient": coef_series.values.round(3),
+        "Direction": ["↑ helps win" if c > 0 else "↓ hurts win" for c in coef_series.values],
+    })
+
+    accuracy_df = pd.DataFrame({
+        "Model": ["Baseline (always pick favourite)", "Logistic Regression (LOO-CV)"],
+        "Accuracy (%)": [round(baseline_acc * 100, 1), round(ml_acc * 100, 1)],
+    })
+
+    return coef_df, accuracy_df
+
+
 def create_simulation_summary(sim_paths, p0):
     """
     Summarise a set of simulated paths into a stats table.

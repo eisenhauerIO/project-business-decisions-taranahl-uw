@@ -8,6 +8,7 @@ def test_import_tables():
     assert hasattr(tables, "create_table1")
     assert hasattr(tables, "create_market_summary")
     assert hasattr(tables, "create_simulation_summary")
+    assert hasattr(tables, "create_ml_summary")
 
 
 def test_import_predictions():
@@ -44,3 +45,13 @@ def test_import_simulator():
     assert hasattr(simulator, "simulate_paths")
     assert hasattr(simulator, "bootstrap_paths")
     assert hasattr(simulator, "estimate_volatility")
+    assert hasattr(simulator, "build_ml_dataset")
+
+
+def test_import_polymarket():
+    """Test that polymarket module can be imported with expected functions."""
+    from auxiliary import polymarket
+
+    assert hasattr(polymarket, "load_polymarket_sports")
+    assert hasattr(polymarket, "load_polymarket_nba")
+    assert hasattr(polymarket, "polymarket_calibration")

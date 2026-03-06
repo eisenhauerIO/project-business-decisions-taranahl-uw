@@ -29,3 +29,6 @@ Thumbs.db
 dist/
 build/
 *.egg-info/
+
+# Large data files (download separately from Kaggle — see notebook Section 3.5)
+data/polymarket_markets.csv
