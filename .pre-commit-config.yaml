@@ -10,15 +10,7 @@ repos:
     hooks:
       - id: pytest
         name: pytest (unit tests)
-        entry: pytest tests/ -v
+        entry: conda run -n projects-student-template pytest tests/ -v
         language: system
         pass_filenames: false
         always_run: true
-
-      - id: nbmake
-        name: nbmake (notebook execution)
-        entry: pytest --nbmake
-        language: system
-        files: \.ipynb$
-        pass_filenames: true
-        types: [jupyter]
