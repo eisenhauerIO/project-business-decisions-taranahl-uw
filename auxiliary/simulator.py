@@ -55,9 +55,7 @@ def prepare_data(trade_df, n_bins=100):
     if duration == 0:
         df["time_pct"] = 0.0
     else:
-        df["time_pct"] = (
-            (df["datetime"] - t_start).dt.total_seconds() / duration * 100
-        )
+        df["time_pct"] = (df["datetime"] - t_start).dt.total_seconds() / duration * 100
 
     # Clip away exact 0/1 to avoid logit blowing up
     p = df["probability"].clip(0.01, 0.99)
@@ -272,7 +270,11 @@ def build_ml_dataset(histories, settled_markets):
         n_trades, duration_min, won (0/1).  Rows with missing outcomes are
         dropped.
     """
-    result_map = settled_markets.set_index("ticker")["result"] if "result" in settled_markets.columns else {}
+    result_map = (
+        settled_markets.set_index("ticker")["result"]
+        if "result" in settled_markets.columns
+        else {}
+    )
 
     rows = []
     for ticker, df in histories.items():
@@ -288,14 +290,16 @@ def build_ml_dataset(histories, settled_markets):
         if result not in ("yes", "no"):
             continue
 
-        rows.append({
-            "ticker": ticker,
-            "open_prob": round(float(p.iloc[0]), 4),
-            "logit_volatility": round(vol, 4),
-            "n_trades": len(df),
-            "duration_min": round(duration, 1),
-            "won": 1 if result == "yes" else 0,
-        })
+        rows.append(
+            {
+                "ticker": ticker,
+                "open_prob": round(float(p.iloc[0]), 4),
+                "logit_volatility": round(vol, 4),
+                "n_trades": len(df),
+                "duration_min": round(duration, 1),
+                "won": 1 if result == "yes" else 0,
+            }
+        )
 
     return pd.DataFrame(rows)
 

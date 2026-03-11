@@ -18,11 +18,38 @@ import pandas as pd
 
 # NBA team names used to filter sports markets down to basketball
 _NBA_KEYWORDS = [
-    "NBA", "Knicks", "Lakers", "Warriors", "Celtics", "Bucks", "Nets",
-    "Heat", "Bulls", "Nuggets", "Suns", "Clippers", "Mavericks", "Spurs",
-    "Rockets", "Thunder", "Timberwolves", "Pacers", "Cavaliers", "Pistons",
-    "Raptors", "Magic", "Hornets", "Hawks", "Wizards", "Pelicans", "Grizzlies",
-    "Jazz", "Trail Blazers", "Kings", "76ers", "Sixers",
+    "NBA",
+    "Knicks",
+    "Lakers",
+    "Warriors",
+    "Celtics",
+    "Bucks",
+    "Nets",
+    "Heat",
+    "Bulls",
+    "Nuggets",
+    "Suns",
+    "Clippers",
+    "Mavericks",
+    "Spurs",
+    "Rockets",
+    "Thunder",
+    "Timberwolves",
+    "Pacers",
+    "Cavaliers",
+    "Pistons",
+    "Raptors",
+    "Magic",
+    "Hornets",
+    "Hawks",
+    "Wizards",
+    "Pelicans",
+    "Grizzlies",
+    "Jazz",
+    "Trail Blazers",
+    "Kings",
+    "76ers",
+    "Sixers",
 ]
 
 
@@ -60,9 +87,9 @@ def load_polymarket_sports(filepath="data/polymarket_markets.csv"):
             return []
 
     sports["_outcomes"] = sports["outcomes"].apply(_parse_outcomes)
-    binary = sports[sports["_outcomes"].apply(
-        lambda x: len(x) == 2 and set(x) == {"Yes", "No"}
-    )].copy()
+    binary = sports[
+        sports["_outcomes"].apply(lambda x: len(x) == 2 and set(x) == {"Yes", "No"})
+    ].copy()
 
     # Extract Yes-side price from outcomePrices JSON
     def _yes_price(row):
@@ -78,8 +105,15 @@ def load_polymarket_sports(filepath="data/polymarket_markets.csv"):
     binary = binary.dropna(subset=["yes_price"])
     binary = binary[(binary["yes_price"] > 0) & (binary["yes_price"] < 1)]
 
-    keep = ["question", "event_title", "yes_price", "volume",
-            "closed", "sportsMarketType", "lastTradePrice"]
+    keep = [
+        "question",
+        "event_title",
+        "yes_price",
+        "volume",
+        "closed",
+        "sportsMarketType",
+        "lastTradePrice",
+    ]
     available = [c for c in keep if c in binary.columns]
     return binary[available].reset_index(drop=True)
 
@@ -103,10 +137,9 @@ def load_polymarket_nba(filepath="data/polymarket_markets.csv"):
         return None
 
     pattern = "|".join(_NBA_KEYWORDS)
-    mask = (
-        sports["question"].str.contains(pattern, case=False, na=False)
-        | sports["event_title"].str.contains(pattern, case=False, na=False)
-    )
+    mask = sports["question"].str.contains(pattern, case=False, na=False) | sports[
+        "event_title"
+    ].str.contains(pattern, case=False, na=False)
     return sports[mask].reset_index(drop=True)
 
 
@@ -141,9 +174,7 @@ def polymarket_calibration(df, n_bins=8):
     closed["won"] = (closed["yes_price"].astype(float) > 0.5).astype(int)
 
     # Keep only well-defined predictions
-    closed = closed[
-        (closed["pred_prob"] > 0.01) & (closed["pred_prob"] < 0.99)
-    ]
+    closed = closed[(closed["pred_prob"] > 0.01) & (closed["pred_prob"] < 0.99)]
     if len(closed) < n_bins:
         return pd.DataFrame()
 
